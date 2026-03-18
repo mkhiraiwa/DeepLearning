@@ -102,10 +102,10 @@ abline(v = log10(N50_mm), col = "red", lty = 2)
 #　精度比較
 ###############################
 #写真idとタンクの対応
-mesopic <- read_csv("meso_pic_20250901.csv", locale = readr::locale(encoding = "CP932"))%>%
-  mutate(photo_id = unlist(strsplit(photo_name, ".JPG")), id = paste(block, tank, net, week, sep = "_"), use = 揃ってるデータ, time = アノテーション時間)%>%
+mesopic <- read_csv("meso_pic_20260317.csv", locale = readr::locale(encoding = "CP932"))%>%
+  mutate(photo_id = unlist(strsplit(photo_name, ".JPG")), id = paste(block, tank, net, week, sep = "_"), use = 揃ってるデータ, time = アノテーション時間, anno = 自力アノテーション)%>%
   dplyr::filter(use == 1)%>%
-  dplyr::select(id, photo_id, week, block, tank, net, use, time)
+  dplyr::select(id, photo_id, week, block, tank, net, use, time, anno)
 mesopic
 
 #Ground Truth
@@ -136,7 +136,7 @@ photo <- read_csv("annotation_summary_photo.csv", locale = readr::locale(encodin
   mutate(photo_id = unlist(strsplit(xml_name, ".xml")))%>%
   right_join(mesopic, by = "photo_id")%>%
   mutate(method = "photo", total9 = boufura + hiru + itotonbo + makigai + meiga + nimaigai + tonbo + yanma + yusurika)%>%
-  dplyr::select(id, photo_id, week, block, tank, net, method, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika)%>%
+  dplyr::select(id, photo_id, week, block, tank, net, method, time, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika)%>%
   merge(GT, by = "photo_id", suffixes = c("", "_GT"))
 photo
 
@@ -274,16 +274,11 @@ p
 
 
 #時間
-#写真idとタンクの対応
-mesotime <- read_csv("meso_pic_20250901.csv", locale = readr::locale(encoding = "CP932"))
-mesotime
+plot(time ~ total9, photo)
+max(photo$time, na.rm = T)
+max(photo$total9, na.rm = T)
+hist(photo$time, na.rm = T)
 
-
-%>%
-  mutate(photo_id = unlist(strsplit(photo_name, ".JPG")), id = paste(block, tank, net, week, sep = "_"), use = 揃ってるデータ)%>%
-  dplyr::filter(use == 1)%>%
-  dplyr::select(id, photo_id, week, block, tank, net, use)
-mesopic
 
 
 
