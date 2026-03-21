@@ -136,18 +136,27 @@ photo <- read_csv("annotation_summary_photo.csv", locale = readr::locale(encodin
   mutate(photo_id = unlist(strsplit(xml_name, ".xml")))%>%
   right_join(mesopic, by = "photo_id")%>%
   mutate(method = "photo", total9 = boufura + hiru + itotonbo + makigai + meiga + nimaigai + tonbo + yanma + yusurika)%>%
-  dplyr::select(id, photo_id, week, block, tank, net, method, time, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika)%>%
-  merge(GT, by = "photo_id", suffixes = c("", "_GT"))
+  mutate(total = total9 + kaiebi + kagerou + matsumomushi + gamushi_youchu + amagaeru + gamushi_seichu + maruhananomi + hanaabu)%>%
+  dplyr::select(id, photo_id, week, block, tank, net, method, time, total, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika)%>%
+  #merge(GT, by = "photo_id", suffixes = c("", "_GT"))
+  left_join(GT, by = "photo_id", suffix = c("", "_GT"))
 photo
 
+
+DLtime <- read_csv("split_time_summary.csv", locale = readr::locale(encoding = "CP932"))%>%
+  mutate(photo_id = image_name, time = split_time_sec + predict_time_sec + merge_count_time_sec)%>%
+  dplyr::select(photo_id, time)
+DLtime
 
 #DL
 DL <- read_csv("predict_9sp.csv", locale = readr::locale(encoding = "CP932"))%>%
   mutate(photo_id = unlist(strsplit(file_name, ".jpg")))%>%
   right_join(mesopic, by = "photo_id")%>%
   mutate(method = "DL", total9 = boufura + hiru + itotonbo + makigai + meiga + nimaigai + tonbo + yanma + yusurika)%>%
-  dplyr::select(id, photo_id, week, block, tank, net, method, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika)%>%
-  merge(GT, by = "photo_id", suffixes = c("", "_GT"))
+  mutate(total = total9)%>%
+  dplyr::select(id, photo_id, week, block, tank, net, method, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika, total)%>%
+  merge(GT, by = "photo_id", suffixes = c("", "_GT"))%>%
+  merge(DLtime, by = "photo_id", suffixes = c("", "_GT"))
 DL
 
 
@@ -270,19 +279,63 @@ p <- ggplot(df, aes(x = total9_GT, y = total9)) +
   )
 p
 
+p <- ggplot(df, aes(x = log10(total9_GT), y = log10(total9), color = method)) +
+  #facet_wrap(~method)+
+  geom_point(alpha = 0.7)+#, color = "black") +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", size = 0.8) +  # 1:1線
+  #coord_fixed(ratio = 1, xlim = c(0, axis_max), ylim = c(0, axis_max)) +  # 軸の比率を1:1に固定
+  theme_bw(base_size = 12) +
+  #labs(
+  #  x = NULL, y = NULL,
+  #  title = paste0(sp, "\n(r = ", sprintf("%.2f", r), ")")
+  #) +
+  theme(
+    plot.title = element_text(size = 12, hjust = 0.5),
+    panel.grid.minor = element_blank()
+  )
+p
 
 
 
 #時間
-plot(time ~ total9, photo)
+plot(time ~ log10(total), photo)
+plot(time ~ total, direct, xlim = c(0,1200))
 max(photo$time, na.rm = T)
-max(photo$total9, na.rm = T)
+max(photo$total, na.rm = T)
 hist(photo$time, na.rm = T)
 
+library(ggplot2)
+
+ggplot(df, aes(x = log10(total), y = time, color = method)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "glm",
+              method.args = list(family = Gamma(link = "log")),
+              se = F) +
+  theme_bw() +
+  labs(x = "Total", y = "Time", color = "Method")
+
+
+ggplot(df, aes(x = total, y = time, color = method)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm",se = F) +
+  theme_bw() +
+  labs(x = "Total", y = "Time", color = "Method")
+
+
+ggplot(df, aes(x = log10(total), y = log10(time), color = method)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm",
+              se = FALSE) +
+  theme_bw() +
+  labs(x = "Total", y = "Time", color = "Method")
 
 
 
-
+ggplot(df, aes(x = total, y = time, color = method)) +
+  geom_point(size = 2, alpha = 0.8) +
+  theme_bw() +
+  labs(x = "Total", y = "Time", color = "Method")
 
 
 
