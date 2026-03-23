@@ -125,7 +125,7 @@ direct <- read_csv("manual.csv", locale = readr::locale(encoding = "CP932"))%>%
   merge(GT, by = "id", suffixes = c("", "_GT"))
 direct
 
-
+write.csv(direct,"direct_GT.csv")
 
 
 #plot(hiru ~ hiru_GT, direct)
@@ -339,6 +339,7 @@ ggplot(df, aes(x = total, y = time, color = method)) +
 
 
 
+#検出率　サイズ
 
 
 
