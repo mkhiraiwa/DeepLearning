@@ -1087,7 +1087,7 @@ newdat$upr <- plogis(newdat$fit_link + 1.96 * newdat$se_link)
 # -------------------------------
 # 作図
 # -------------------------------
-ggplot(newdat, aes(x = log10_gt_area_px, y = fit,
+f5_1 <- ggplot(newdat, aes(x = log10_gt_area_px, y = fit,
                    color = method, fill = method)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2, color = NA) +
   geom_line(linewidth = 1.2) +
@@ -1104,8 +1104,9 @@ ggplot(newdat, aes(x = log10_gt_area_px, y = fit,
     legend.text = element_text(size = 14),
     legend.title = element_text(size = 14)
   )
+f5_1
 
-ggsave("figure_detect_vs_size_glmmTMB.pdf", width = 6, height = 4)
+#ggsave("figure_detect_vs_size_glmmTMB.pdf", width = 6, height = 4)
 
 
 #noise
@@ -1116,12 +1117,12 @@ newdat_noise <- expand.grid(
   noise = seq(min(plot_df$noise, na.rm = TRUE),
               max(plot_df$noise, na.rm = TRUE),
               length.out = 200),
-  method = levels(plot_df$method),
+  method = levels(df_recall$method),
   log10_gt_area_px = mean(plot_df$log10_gt_area_px, na.rm = TRUE)
 )
 
 # 予測
-pred_noise <- predict(glm_detect,
+pred_noise <- predict(glm_recall,
                       newdata = newdat_noise,
                       type = "link",
                       se.fit = TRUE,
@@ -1138,7 +1139,7 @@ newdat_noise$upr <- plogis(newdat_noise$fit_link + 1.96 * newdat_noise$se_link)
 # -------------------------------
 # 作図
 # -------------------------------
-ggplot(newdat_noise, aes(x = noise, y = fit,
+f5_2 <- ggplot(newdat_noise, aes(x = noise, y = fit,
                          color = method, fill = method)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2, color = NA) +
   geom_line(linewidth = 1.2) +
@@ -1147,7 +1148,7 @@ ggplot(newdat_noise, aes(x = noise, y = fit,
   scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2))+
   theme_bw() +
   xlab("Noise") +
-  ylab("Detection probability") +
+  ylab("Recall") +
   labs(color = "Method", fill = "Method") +
   theme(
     axis.text = element_text(size = 14),
@@ -1155,56 +1156,27 @@ ggplot(newdat_noise, aes(x = noise, y = fit,
     legend.text = element_text(size = 14),
     legend.title = element_text(size = 14)
   )
-
-ggsave("figure_detect_vs_noise_glmmTMB.pdf", width = 6, height = 4)
+f5_2
+#ggsave("figure_detect_vs_noise_glmmTMB.pdf", width = 6, height = 4)
 
 
 
 #Presicion
-library(readr)
-library(dplyr)
-library(glmmTMB)
-library(ggplot2)
 
 # -------------------------------
 # データ読み込み
 # -------------------------------
-target_species <- c(
-  "tonbo", "makigai", "yanma", "yusurika",
-  "boufura", "itotonbo", "hiru", "meiga", "nimaigai"
-)
-
-df_precision <- read_csv(
-  "bbox_level_precision_01_common_only.csv",
-  locale = readr::locale(encoding = "CP932")
-)%>%
-  filter(species %in% target_species)
-
-df_yosoku <- read_csv(
-  "yosoku15.csv",
-  locale = readr::locale(encoding = "CP932")
-) %>%
-  mutate(image_id = photo_id) %>%
-  dplyr::select(image_id, noise)
-
-df_precision <- df_precision %>%
-  left_join(df_yosoku, by = "image_id")
-
-# methodの順序
-df_precision$method <- factor(df_precision$method, levels = c("photo", "DL", "DLphoto"))
-
-# 色
-method_cols <- c(
-  "DL"      = "#D55E00",
-  "photo"   = "#0072B2",
-  "direct"  = "#009E73",
-  "DLphoto" = "black"
-)
+df_precision <- read_csv("bbox_level_precision_01_common_only.csv", locale = readr::locale(encoding = "CP932"))%>%
+  filter(species %in% target_species)%>%
+  left_join(df_yosoku, by = "image_id")%>%
+  filter(!is.na(log10_pred_area_px), !is.na(correct))%>%
+  mutate(method = factor(df_precision$method, levels = c("photo", "DL", "DLphoto")))
+df_precision
 
 # -------------------------------
 # モデル
 # -------------------------------
-glm_precision <- glmmTMB(
+glm_precision_species <- glmmTMB(
   correct ~ log10_pred_area_px * method + noise * method + (1|image_id) + (1|species),
   family = binomial,
   data = df_precision
@@ -1250,7 +1222,7 @@ newdat_precision_size$fit <- plogis(newdat_precision_size$fit_link)
 newdat_precision_size$lwr <- plogis(newdat_precision_size$fit_link - 1.96 * newdat_precision_size$se_link)
 newdat_precision_size$upr <- plogis(newdat_precision_size$fit_link + 1.96 * newdat_precision_size$se_link)
 
-ggplot(newdat_precision_size, aes(x = log10_pred_area_px, y = fit,
+f5_3 <- ggplot(newdat_precision_size, aes(x = log10_pred_area_px, y = fit,
                                   color = method, fill = method)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2, color = NA) +
   geom_line(linewidth = 1.2) +
@@ -1267,8 +1239,8 @@ ggplot(newdat_precision_size, aes(x = log10_pred_area_px, y = fit,
     legend.text = element_text(size = 14),
     legend.title = element_text(size = 14)
   )
-
-ggsave("figure_precision_vs_size_glmmTMB.pdf", width = 6, height = 4)
+f5_3
+#ggsave("figure_precision_vs_size_glmmTMB.pdf", width = 6, height = 4)
 
 # -------------------------------
 # noiseを横軸にした予測図
@@ -1299,7 +1271,7 @@ newdat_precision_noise$fit <- plogis(newdat_precision_noise$fit_link)
 newdat_precision_noise$lwr <- plogis(newdat_precision_noise$fit_link - 1.96 * newdat_precision_noise$se_link)
 newdat_precision_noise$upr <- plogis(newdat_precision_noise$fit_link + 1.96 * newdat_precision_noise$se_link)
 
-ggplot(newdat_precision_noise, aes(x = noise, y = fit,
+f5_4 <- ggplot(newdat_precision_noise, aes(x = noise, y = fit,
                                    color = method, fill = method)) +
   geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.2, color = NA) +
   geom_line(linewidth = 1.2) +
@@ -1316,15 +1288,24 @@ ggplot(newdat_precision_noise, aes(x = noise, y = fit,
     legend.text = element_text(size = 14),
     legend.title = element_text(size = 14)
   )
-
-ggsave("figure_precision_vs_noise_glmmTMB.pdf", width = 6, height = 4)
-
+f5_4
 
 
+#ggsave("figure_precision_vs_noise_glmmTMB.pdf", width = 6, height = 4)
+library(patchwork)
+(f5_1 | f5_2) / (f5_3 | f5_4) +
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "right",
+    legend.justification = "top"
+  )
+ggsave("figure_5.pdf", width=8, height=6)
 
 
 
-
+###############
+#############
+#############
 
 
 
