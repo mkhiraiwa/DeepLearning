@@ -265,11 +265,29 @@ DL <- read_csv("predict_9sp.csv", locale = readr::locale(encoding = "CP932"))%>%
   merge(DLtime, by = "photo_id", suffixes = c("", "_GT"))
 DL
 
+#DL+photo
+dlphoto_time <- read_csv("yosoku15.csv", locale = readr::locale(encoding = "CP932"))%>%
+  dplyr::select(photo_id, time)
+dlphoto_time
+
+DLphoto <- read_csv("annotation_summary_DL_photo.csv", locale = readr::locale(encoding = "CP932"))%>%
+  mutate(photo_id = unlist(strsplit(xml_name, ".xml")))%>%
+  right_join(mesopic, by = "photo_id")%>%
+  mutate(method = "DLphoto", total9 = boufura + hiru + itotonbo + makigai + meiga + nimaigai + tonbo + yanma + yusurika)%>%
+  mutate(total = total9)%>%
+  dplyr::select(id, photo_id, week, block, tank, net, method, total9, boufura, hiru, itotonbo, makigai, meiga, nimaigai, tonbo, yanma, yusurika, total)%>%
+  right_join(dlphoto_time, by = "photo_id")%>%
+  left_join(GT, by = "photo_id", suffix = c("", "_GT"))
+DLphoto
+
+
+
 
 df <- direct%>%
   dplyr::bind_rows(photo)%>%
   dplyr::bind_rows(DL)%>%
-  mutate(method = factor(method, levels = c("direct", "photo","DL")))
+  dplyr::bind_rows(DLphoto)%>%
+  mutate(method = factor(method, levels = c("direct", "photo", "DL", "DLphoto")))
 df
 
 plot(total9 ~ total9_GT, df, col=c(1:3)[as.factor(df$method)])
@@ -696,312 +714,10 @@ ggplot(df2, aes(x = richness_obs, y = simpson_obs)) +
   ylab("Observed Simpson")
 
 
-#時間
-plot(time ~ log10(total), photo)
-plot(time ~ total, direct, xlim = c(0,1200))
-max(photo$time, na.rm = T)
-max(photo$total, na.rm = T)
-hist(photo$time, na.rm = T)
 
 
-direct$log10_total <- log10(direct$total)
-photo$log10_total  <- log10(photo$total)
-DL$log10_total     <- log10(DL$total)
-df$log10_total     <- log10(df$total)
 
-library(glmmTMB)
-glm_time_direct <- glmmTMB(log(time) ~ log10_total + (1|counter) + (1|week), direct, family = gaussian)
-summary(glm_time_direct)
 
-glm_time_photo <- glmmTMB(log(time) ~ log10_total + (1|week), photo, family = gaussian)
-summary(glm_time_photo)
-
-glm_time_DL <- glmmTMB(log(time) ~ log10_total + (1|week), DL, family = gaussian)
-summary(glm_time_DL)
-
-
-library(ggeffects)
-library(ggplot2)
-library(dplyr)
-
-pred_direct <- ggpredict(glm_time_direct, terms = "log10_total")
-pred_direct$method <- "direct"
-
-pred_photo <- ggpredict(glm_time_photo, terms = "log10_total")
-pred_photo$method <- "photo"
-
-pred_DL <- ggpredict(glm_time_DL, terms = "log10_total")
-pred_DL$method <- "DL"
-
-pred_all <- bind_rows(pred_direct, pred_photo, pred_DL)
-pred_all$method <- factor(pred_all$method, levels = c("direct", "photo","DL"))
-
-method_cols <- c(
-  "DL"     = "#D55E00",
-  "photo"  = "#0072B2",
-  "direct" = "#009E73"
-)
-
-ggplot() +
-  geom_point(
-    data = df,
-    aes(x = log10_total, y = time, color = method),
-    alpha = 0.3
-  ) +
-  geom_ribbon(
-    data = pred_all,
-    aes(x = x, ymin = conf.low, ymax = conf.high, fill = method),
-    alpha = 0.2,
-    color = NA
-  ) +
-  geom_line(
-    data = pred_all,
-    aes(x = x, y = predicted, color = method),
-    linewidth = 1.2
-  ) +
-  
-  # ← ここが重要
-  scale_color_manual(values = method_cols) +
-  scale_fill_manual(values = method_cols) +
-  
-  theme_bw() +
-  xlab("log10 total individuals") +
-  ylab("Time (s)") +
-  labs(color = "Method", fill = "Method") +
-  theme(
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16)
-  )
-ggsave("figure_time_vs_total.pdf", width = 6, height = 4)
-
-tapply(df$time, df$method, mean, na.rm = T)
-
-
-library(ggplot2)
-
-ggplot(direct, aes(x = log10(total), y = time, color = counter)) +
-  geom_point(alpha = 0.7) +
-  geom_smooth(method = "lm", se = FALSE) +
-  theme_bw() +
-  xlab("log10 total individuals") +
-  ylab("Time") +
-  labs(color = "Counter")
-
-
-library(ggplot2)
-
-ggplot(df, aes(x = log10(total), y = time, color = method)) +
-  geom_point(size = 2, alpha = 0.8) +
-  geom_smooth(method = "glm",
-              method.args = list(family = Gamma(link = "log")),
-              se = F) +
-  theme_bw() +
-  labs(x = "Total", y = "Time", color = "Method")
-
-
-ggplot(df, aes(x = total, y = time, color = method)) +
-  geom_point(size = 2, alpha = 0.8) +
-  geom_smooth(method = "lm",se = F) +
-  theme_bw() +
-  labs(x = "Total", y = "Time", color = "Method")
-
-
-ggplot(df, aes(x = log10(total), y = log10(time), color = method)) +
-  geom_point(size = 2, alpha = 0.8) +
-  geom_smooth(method = "lm",
-              se = FALSE) +
-  theme_bw() +
-  labs(x = "Total", y = "Time", color = "Method")
-
-
-
-ggplot(df, aes(x = total, y = time, color = method)) +
-  geom_point(size = 2, alpha = 0.8) +
-  theme_bw() +
-  labs(x = "Total", y = "Time", color = "Method")
-
-
-
-#検出率　サイズ
-
-library(dplyr)
-library(tidyr)
-library(stringr)
-
-# GT列の名前から種名を取得
-gt_species <- c("boufura", "hiru", "itotonbo",
-                "makigai", "meiga", "nimaigai", "tonbo", "yanma", "yusurika")
-
-# 必要列だけ取り出してlong形式へ
-det_rate_df <- df %>%
-  select(method, photo_id, all_of(gt_species), all_of(paste0(gt_species, "_GT"))) %>%
-  pivot_longer(
-    cols = -c(method, photo_id),
-    names_to = "name",
-    values_to = "count"
-  ) %>%
-  mutate(
-    species = str_remove(name, "_GT$"),
-    type = if_else(str_detect(name, "_GT$"), "GT", "det")
-  ) %>%
-  select(-name) %>%
-  pivot_wider(
-    names_from = type,
-    values_from = count
-  ) %>%
-  mutate(
-    detection_rate = ifelse(GT == 0, NA, det / GT)
-  ) %>%
-  select(method, photo_id, species, detection_rate)%>%
-  mutate(image_name = paste0(photo_id, ".jpg"))
-
-det_rate_df
-
-
-df_size <- read_csv("bbox_size_summary_by_image_species.csv", locale = readr::locale(encoding = "CP932"))
-
-
-merged_df <- det_rate_df %>%
-  left_join(df_size, by = c("image_name", "species"))
-
-
-library(ggplot2)
-library(dplyr)
-
-plot_df <- merged_df %>%
-  filter(!is.na(detection_rate), !is.na(mean_area_px))
-
-ggplot(plot_df, aes(x = log10(mean_area_px), y = detection_rate)) +
-  geom_point(alpha = 0.6) +
-  facet_wrap(~ method) +
-  theme_bw() +
-  xlab("Mean bbox area (px)") +
-  ylab("Detection rate")
-
-
-
-
-
-
-#photoとDLだけ比較
-
-
-df_size <- read_csv("bbox_level_detection_01_common_only.csv", locale = readr::locale(encoding = "CP932"))
-df_size
-df_yosoku <- read_csv("yosoku15.csv", locale = readr::locale(encoding = "CP932"))%>%
-  mutate(image_id = photo_id)%>%
-  dplyr::select(image_id,noise)
-df_yosoku
-
-df_size <- df_size%>%
-  left_join(df_yosoku, by = "image_id")
-df_size
-
-
-library(ggplot2)
-library(readr)
-library(dplyr)
-
-#df_size <- read_csv("D:/deeplearning_meso/bbox_level_detection_01_common_only.csv")
-
-# NA除去（念のため）
-plot_df <- df_size %>%
-  filter(!is.na(log10_gt_area_px), !is.na(detected))
-
-
-method_cols <- c(
-  "DL"     = "#D55E00",
-  "photo"  = "#0072B2",
-  "direct" = "#009E73",
-  "DLphoto" = "black"
-)
-
-ggplot(plot_df, aes(x = log10_gt_area_px, y = detected,
-                    color = method, fill = method)) +
-  geom_smooth(method = "glm",
-              method.args = list(family = "binomial"),
-              se = TRUE,
-              linewidth = 1.2) +
-  scale_color_manual(values = method_cols) +
-  scale_fill_manual(values = method_cols) +
-  theme_bw() +
-  xlab("log10 bbox area (px)") +
-  ylab("Detection probability") +
-  labs(color = "Method", fill = "Method")+
-  theme(
-    axis.text = element_text(size = 14),   # ← 目盛り
-  )
-ggsave("figure_detect_vs_size.pdf", width = 6, height = 4)
-
-plot_df$method <- factor(plot_df$method, levels = c("photo", "DL", "DLphoto"))
-
-glm_detect <- glm(detected ~ log10_gt_area_px * method + noise * method, family = binomial, plot_df)
-summary(glm_detect)
-
-
-glm_detect <- glmmTMB(detected ~ log10_gt_area_px * method + noise * method + (1|image_id) + (1|species), family = binomial, plot_df)
-summary(glm_detect)
-
-
-#######kakunin
-library(readr)
-library(dplyr)
-library(glmmTMB)
-library(ggplot2)
-library(ggeffects)
-
-df_size <- read_csv("bbox_level_detection_01_common_only.csv",
-                    locale = readr::locale(encoding = "CP932"))
-
-df_yosoku <- read_csv("yosoku15.csv",
-                      locale = readr::locale(encoding = "CP932")) %>%
-  mutate(image_id = photo_id) %>%
-  dplyr::select(image_id, noise)
-
-df_size <- df_size %>%
-  left_join(df_yosoku, by = "image_id")
-
-df_size$method <- factor(df_size$method, levels = c("photo", "DL", "DLphoto"))
-
-method_cols <- c(
-  "DL"      = "#D55E00",
-  "photo"   = "#0072B2",
-  "direct"  = "#009E73",
-  "DLphoto" = "black"
-)
-
-glm_detect <- glmmTMB(
-  detected ~ log10_gt_area_px * method + noise * method + (1|image_id) + (1|species),
-  family = binomial,
-  data = df_size
-)
-
-summary(glm_detect)
-
-pred_size <- ggpredict(
-  glm_detect,
-  terms = c("log10_gt_area_px", "method"),
-  condition = c(noise = mean(df_size$noise, na.rm = TRUE))
-)
-
-ggplot(pred_size, aes(x = x, y = predicted, color = group, fill = group)) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.2, color = NA) +
-  geom_line(linewidth = 1.2) +
-  scale_color_manual(values = method_cols) +
-  scale_fill_manual(values = method_cols) +
-  theme_bw() +
-  xlab("log10 bbox area (px)") +
-  ylab("Detection probability") +
-  labs(color = "Method", fill = "Method") +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme(
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    legend.text = element_text(size = 14),
-    legend.title = element_text(size = 14)
-  )
-
-ggsave("figure_detect_vs_size_ggpredict.pdf", width = 6, height = 4)
 
 
 
@@ -1306,6 +1022,100 @@ ggsave("figure_5.pdf", width=8, height=6)
 ###############
 #############
 #############
+
+
+#時間　Fig.6
+plot(time ~ log10(total), photo)
+plot(time ~ total, direct, xlim = c(0,1200))
+max(photo$time, na.rm = T)
+max(photo$total, na.rm = T)
+hist(photo$time, na.rm = T)
+
+
+direct$log10_total <- log10(direct$total)
+photo$log10_total  <- log10(photo$total)
+DL$log10_total     <- log10(DL$total)
+DLphoto$log10_total     <- log10(DLphoto$total)
+df$log10_total     <- log10(df$total)
+
+
+library(glmmTMB)
+glm_time_direct <- glmmTMB(log(time) ~ log10_total + (1|counter) + (1|week), direct, family = gaussian)
+summary(glm_time_direct)
+
+glm_time_photo <- glmmTMB(log(time) ~ log10_total + (1|week), photo, family = gaussian)
+summary(glm_time_photo)
+
+glm_time_DL <- glmmTMB(log(time) ~ log10_total + (1|week), DL, family = gaussian)
+summary(glm_time_DL)
+
+glm_time_DLphoto <- glmmTMB(log(time) ~ log10_total + (1|week), DLphoto, family = gaussian)
+summary(glm_time_DL)
+
+library(ggeffects)
+library(ggplot2)
+library(dplyr)
+
+pred_direct <- ggpredict(glm_time_direct, terms = "log10_total")
+pred_direct$method <- "direct"
+
+pred_photo <- ggpredict(glm_time_photo, terms = "log10_total")
+pred_photo$method <- "photo"
+
+pred_DL <- ggpredict(glm_time_DL, terms = "log10_total")
+pred_DL$method <- "DL"
+
+pred_DLphoto <- ggpredict(glm_time_DLphoto, terms = "log10_total")
+pred_DLphoto$method <- "DLphoto"
+
+pred_all <- bind_rows(pred_direct, pred_photo, pred_DL, pred_DLphoto)
+pred_all$method <- factor(pred_all$method, levels = c("direct", "photo","DL", "DLphoto"))
+
+
+ggplot() +
+  geom_point(
+    data = df,
+    aes(x = log10_total, y = time, color = method),
+    alpha = 0.3
+  ) +
+  geom_ribbon(
+    data = pred_all,
+    aes(x = x, ymin = conf.low, ymax = conf.high, fill = method),
+    alpha = 0.2,
+    color = NA
+  ) +
+  geom_line(
+    data = pred_all,
+    aes(x = x, y = predicted, color = method),
+    linewidth = 1.2
+  ) +
+  
+  # ← ここが重要
+  scale_color_manual(values = method_cols) +
+  scale_fill_manual(values = method_cols) +
+  
+  theme_bw() +
+  xlab("log10 total individuals") +
+  ylab("Time (s)") +
+  labs(color = "Method", fill = "Method") +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16)
+  )
+ggsave("Fig6_time_vs_total.pdf", width = 6, height = 4)
+
+tapply(df$time, df$method, mean, na.rm = T)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
