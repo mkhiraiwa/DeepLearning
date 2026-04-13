@@ -508,6 +508,97 @@ p <- ggplot(df, aes_string(x = "spno_GT", y = "spno")) +
   )
 p
 
+summary(lm(spno~spno_GT,df[df$method=="direct",]))
+summary(lm(spno~spno_GT,df[df$method=="photo",]))
+summary(lm(spno~spno_GT,df[df$method=="DLphoto",]))
+summary(lm(spno~spno_GT,df[df$method=="DLphoto",]))
+
+##種数改善
+library(dplyr)
+library(ggplot2)
+
+# 種数を計算
+df$spno <- apply(ifelse(df[, species_list[-1]] > 0, 1, 0), 1, sum)
+
+gt_cols <- paste0(species_list[-1], "_GT")
+df$spno_GT <- apply(ifelse(df[, gt_cols] > 0, 1, 0), 1, sum)
+
+# method の順序
+df$method <- factor(df$method, levels = c("direct", "photo", "DL", "DLphoto"))
+
+# 手法ごとの色
+method_cols <- c(
+  "direct"  = "#009E73",
+  "photo"   = "#0072B2",
+  "DL"      = "#D55E00",
+  "DLphoto" = "#E69F00"
+)
+
+# 同じ座標の点の数を集計
+plot_df2 <- df %>%
+  filter(!is.na(spno_GT), !is.na(spno), !is.na(method)) %>%
+  count(method, spno_GT, spno, name = "n")
+
+# 手法ごとに R2 を計算
+r2_df <- df %>%
+  filter(!is.na(spno_GT), !is.na(spno), !is.na(method)) %>%
+  group_by(method) %>%
+  summarise(
+    r2 = summary(lm(spno ~ spno_GT, data = cur_data()))$r.squared,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = paste0("R² = ", sprintf("%.2f", r2)),
+    x = 8.8,
+    y = 0.4
+  )
+
+p <- ggplot(plot_df2, aes(x = spno_GT, y = spno, color = method)) +
+  facet_wrap(~method, nrow = 1) +
+  geom_point(aes(size = n), alpha = 0.7) +
+  geom_smooth(
+    data = df,
+    aes(x = spno_GT, y = spno, color = method),
+    method = "lm", se = FALSE, linewidth = 1, inherit.aes = FALSE
+  ) +
+  geom_abline(
+    slope = 1, intercept = 0,
+    linetype = "dashed", color = "red", linewidth = 0.8
+  ) +
+  geom_text(
+    data = r2_df,
+    aes(x = x, y = y, label = label, color = method),
+    inherit.aes = FALSE,
+    hjust = 1, vjust = 0, size = 4
+  ) +
+  scale_color_manual(values = method_cols) +
+  coord_fixed(ratio = 1, xlim = c(0, 9), ylim = c(0, 9)) +
+  theme_bw(base_size = 12) +
+  labs(
+    x = "Ground truth species richness",
+    y = "Estimated species richness",
+    color = "Method",
+    size = "n"
+  ) +
+  theme(
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = "white"),
+    strip.text = element_text(size = 11),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 13),
+    legend.text = element_text(size = 11),
+    legend.title = element_text(size = 12)
+  )
+
+print(p)
+
+ggsave(
+  filename = "species_richness_method_comparison.pdf",
+  plot = p,
+  width = 9,
+  height = 3,
+  units = "in"
+)
 
 
 p <- ggplot(df, aes(x = spno_GT, y = spno)) +
