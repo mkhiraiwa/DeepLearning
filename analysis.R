@@ -203,6 +203,117 @@ ggsave("Precision_vs_total.pdf", width = 4, height = 4)
 
 
 
+#####
+# 精度個体数
+##
+library(glmmTMB)
+
+data15 <- read_csv("tp_fp_fn_yolo11x_15sp_all_ratios_test.csv", locale = readr::locale(encoding = "CP932")) %>%
+  mutate(total = train + valid) %>%
+  mutate(log10total = log10(total))
+data15
+
+m_recall <- glmmTMB(
+  cbind(TP, FN) ~ log10total + (1 | species),
+  family = binomial,
+  data = data15
+)
+summary(m_recall)
+
+
+library(ggplot2)
+library(ggeffects)
+
+# 観測値
+data15$recall_obs <- data15$TP / (data15$TP + data15$FN)
+
+# 予測値：固定効果のみ
+pred_recall <- ggpredict(
+  m_recall,
+  terms = "log10total [all]",
+  type = "fixed"
+)
+
+ggplot() +
+  geom_point(
+    data = data15,
+    aes(x = log10total, y = recall_obs, color = species, size = TP + FN),
+    alpha = 0.7
+  ) +
+  geom_ribbon(
+    data = pred_recall,
+    aes(x = x, ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+  geom_line(
+    data = pred_recall,
+    aes(x = x, y = predicted),
+    linewidth = 1,
+    inherit.aes = FALSE
+  ) +
+  scale_y_continuous(limits = c(0, 1), name = "Recall") +
+  scale_x_continuous(name = expression(log[10]("training instances"))) +
+  labs(color = "Species", size = "GT count") +
+  theme_classic(base_size = 14)
+ggsave("recall_vs_total.pdf", width = 10, height = 7)
+
+#precision
+library(glmmTMB)
+library(ggplot2)
+library(ggeffects)
+
+# Precisionは TP + FP が0の行では定義できないため除外
+data15_precision <- subset(data15, TP + FP > 0)
+
+# 念のため型を整える
+data15_precision$species <- as.factor(data15_precision$species)
+
+# Precision model
+m_precision <- glmmTMB(
+  cbind(TP, FP) ~ log10total + (1 | species),
+  family = binomial,
+  data = data15_precision
+)
+
+summary(m_precision)
+
+# 観測値
+data15_precision$precision_obs <- data15_precision$TP /
+  (data15_precision$TP + data15_precision$FP)
+
+# 予測値：固定効果のみ
+pred_precision <- ggpredict(
+  m_precision,
+  terms = "log10total [all]",
+  type = "fixed"
+)
+
+# 作図
+ggplot() +
+  geom_point(
+    data = data15_precision,
+    aes(x = log10total, y = precision_obs, color = species, size = TP + FP),
+    alpha = 0.7
+  ) +
+  geom_ribbon(
+    data = pred_precision,
+    aes(x = x, ymin = conf.low, ymax = conf.high),
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+  geom_line(
+    data = pred_precision,
+    aes(x = x, y = predicted),
+    linewidth = 1,
+    inherit.aes = FALSE
+  ) +
+  scale_y_continuous(limits = c(0, 1), name = "Precision") +
+  scale_x_continuous(name = expression(log[10]("training instances"))) +
+  labs(color = "Species", size = "Predicted count") +
+  theme_classic(base_size = 14)
+
+ggsave("precision_vs_total.pdf", width = 10, height = 7)
 
 #############################
 #　精度比較
